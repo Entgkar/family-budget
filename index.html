@@ -998,10 +998,8 @@
   <nav>
     <button class="nav-btn active" onclick="switchTab('dashboard')" data-tab="dashboard">Dashboard</button>
     <button class="nav-btn" onclick="switchTab('transactions')" data-tab="transactions">Transactions</button>
-    <button class="nav-btn" onclick="switchTab('budget')" data-tab="budget">Budget Rules</button>
-    <button class="nav-btn" id="nav-savings-btn" onclick="switchTab('savings')" data-tab="savings">Savings</button>
+    <button class="nav-btn" onclick="switchTab('budget')" data-tab="budget">Budget</button>
     <button class="nav-btn" onclick="switchTab('statistics')" data-tab="statistics">Statistics</button>
-    <button class="nav-btn" onclick="switchTab('planner')" data-tab="planner">Planner</button>
     <button class="nav-btn" id="nav-categories-btn" onclick="switchTab('categories')" data-tab="categories" style="display:none">Categories</button>
   </nav>
 
@@ -1222,6 +1220,25 @@
     <!-- ── BUDGET RULES ── -->
     <div class="tab-content" id="tab-budget" style="width:100%">
 
+      <!-- Budget Sub-tab bar -->
+      <div style="display:flex;gap:0;margin-bottom:24px;border-bottom:2px solid var(--border)">
+        <button class="budget-sub-btn active" data-sub="expenses" onclick="switchBudgetSub('expenses')"
+          style="padding:10px 20px;font-size:0.88rem;font-weight:600;border:none;background:none;cursor:pointer;color:var(--accent);border-bottom:2px solid var(--accent);margin-bottom:-2px;font-family:'DM Sans',sans-serif">
+          Expenses
+        </button>
+        <button class="budget-sub-btn" data-sub="saving-goals" onclick="switchBudgetSub('saving-goals')"
+          style="padding:10px 20px;font-size:0.88rem;font-weight:600;border:none;background:none;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-2px;font-family:'DM Sans',sans-serif">
+          Saving Goals
+        </button>
+        <button class="budget-sub-btn" data-sub="planner" onclick="switchBudgetSub('planner')"
+          style="padding:10px 20px;font-size:0.88rem;font-weight:600;border:none;background:none;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-2px;font-family:'DM Sans',sans-serif">
+          Planner
+        </button>
+      </div>
+
+      <!-- Expenses sub-tab -->
+      <div id="budget-sub-expenses" class="budget-sub-content">
+
       <!-- Unified Add Budget Rule -->
       <div class="add-area" style="margin-bottom:24px" id="budget-add-area">
 
@@ -1289,10 +1306,10 @@
       <div id="periodic-list"></div>
       </div><!-- end budget-rules-single-view -->
       <div id="budget-rules-family-view" style="display:none"></div>
-    </div>
+      </div><!-- end budget-sub-expenses -->
 
-    <!-- ── SAVINGS ── -->
-    <div class="tab-content" id="tab-savings">
+      <!-- Saving Goals sub-tab -->
+      <div id="budget-sub-saving-goals" class="budget-sub-content" style="display:none">
       <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:12px">
         <button class="btn btn-ghost btn-sm" id="savings-archive-toggle" onclick="toggleArchivedGoals()" style="color:var(--text);font-weight:600;border-color:var(--border)">Archived Goals</button>
       </div>
@@ -1317,8 +1334,85 @@
         </div>
       </div>
       <div id="savings-list"></div>
-    </div>
+      </div><!-- end budget-sub-saving-goals -->
 
+      <!-- Planner sub-tab -->
+      <div id="budget-sub-planner" class="budget-sub-content" style="display:none">
+      <div style="max-width:900px;margin:0 auto;padding:0 0 40px">
+
+        <!-- Header -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px">
+          <div>
+            <h2 style="font-family:'DM Serif Display',serif;font-size:1.5rem;margin:0 0 4px">Monthly Planner</h2>
+            <div style="font-size:0.82rem;color:var(--muted)" id="planner-month-label"></div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-ghost btn-sm" onclick="copyLastMonthPlan()" id="planner-copy-btn" style="display:none">↩ Copy Last Month</button>
+            <button class="btn btn-primary btn-sm" onclick="openPlannerAddForm()">+ Add Item</button>
+          </div>
+        </div>
+
+        <!-- Allocation summary bar -->
+        <div class="card" style="margin-bottom:20px;padding:16px 20px" id="planner-summary-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+            <div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted)">Income Allocation</div>
+            <div id="planner-alloc-label" style="font-size:0.82rem;color:var(--muted)"></div>
+          </div>
+          <div style="height:10px;background:var(--surface2);border-radius:99px;overflow:hidden;margin-bottom:10px">
+            <div id="planner-alloc-bar" style="height:100%;border-radius:99px;transition:width 0.4s;background:var(--accent)"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px" id="planner-summary-kpis"></div>
+        </div>
+
+        <!-- Add/Edit form -->
+        <div class="card" id="planner-form-card" style="display:none;margin-bottom:20px;padding:20px">
+          <div style="font-weight:700;font-size:0.95rem;margin-bottom:16px" id="planner-form-title">Add Plan Item</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+            <div class="field">
+              <label class="field-label">Category</label>
+              <select id="plan-cat" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:0.9rem;background:var(--surface);color:var(--text)"></select>
+            </div>
+            <div class="field">
+              <label class="field-label">Planned Amount (€)</label>
+              <input type="number" id="plan-amount" min="0" step="0.01" placeholder="0.00"
+                style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:0.9rem;background:var(--surface);color:var(--text);box-sizing:border-box" />
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+            <div class="field">
+              <label class="field-label">Label (optional)</label>
+              <input type="text" id="plan-label" placeholder="e.g. Summer skiing trip"
+                style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:0.9rem;background:var(--surface);color:var(--text);box-sizing:border-box" />
+            </div>
+            <div class="field" style="display:flex;align-items:flex-end;padding-bottom:2px">
+              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:0.88rem;font-weight:500">
+                <input type="checkbox" id="plan-recurring" style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer" />
+                Recurring every month
+              </label>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-primary btn-sm" onclick="savePlanItem()">Save</button>
+            <button class="btn btn-ghost btn-sm" onclick="closePlannerForm()">Cancel</button>
+          </div>
+        </div>
+
+        <!-- Plan items list -->
+        <div id="planner-items-list"></div>
+
+        <!-- Unplanned spending -->
+        <div id="planner-unplanned-card" style="display:none"></div>
+
+        <!-- Month savings summary -->
+        <div class="card" id="planner-savings-card" style="display:none;margin-top:20px;padding:20px">
+          <div style="font-family:'DM Serif Display',serif;font-size:1.1rem;margin-bottom:16px">Month-end Summary</div>
+          <div id="planner-savings-body"></div>
+        </div>
+
+      </div>
+      </div><!-- end budget-sub-planner -->
+
+    </div><!-- end tab-budget -->
 
     <!-- ── STATISTICS ── -->
     <div class="tab-content" id="tab-statistics">
@@ -1447,83 +1541,6 @@
         </tr></thead><tbody id="stats-history-body"></tbody></table></div>
       </div>
 
-    </div>
-
-    <!-- ── CATEGORIES ── -->
-    <!-- ── PLANNER TAB ── -->
-    <div class="tab-content" id="tab-planner" style="width:100%">
-      <div style="max-width:900px;margin:0 auto;padding:0 0 40px">
-
-        <!-- Header -->
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px">
-          <div>
-            <h2 style="font-family:'DM Serif Display',serif;font-size:1.5rem;margin:0 0 4px">Monthly Planner</h2>
-            <div style="font-size:0.82rem;color:var(--muted)" id="planner-month-label"></div>
-          </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn btn-ghost btn-sm" onclick="copyLastMonthPlan()" id="planner-copy-btn" style="display:none">↩ Copy Last Month</button>
-            <button class="btn btn-primary btn-sm" onclick="openPlannerAddForm()">+ Add Item</button>
-          </div>
-        </div>
-
-        <!-- Allocation summary bar -->
-        <div class="card" style="margin-bottom:20px;padding:16px 20px" id="planner-summary-card">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
-            <div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted)">Income Allocation</div>
-            <div id="planner-alloc-label" style="font-size:0.82rem;color:var(--muted)"></div>
-          </div>
-          <div style="height:10px;background:var(--surface2);border-radius:99px;overflow:hidden;margin-bottom:10px">
-            <div id="planner-alloc-bar" style="height:100%;border-radius:99px;transition:width 0.4s;background:var(--accent)"></div>
-          </div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px" id="planner-summary-kpis"></div>
-        </div>
-
-        <!-- Add/Edit form -->
-        <div class="card" id="planner-form-card" style="display:none;margin-bottom:20px;padding:20px">
-          <div style="font-weight:700;font-size:0.95rem;margin-bottom:16px" id="planner-form-title">Add Plan Item</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-            <div class="field">
-              <label class="field-label">Category</label>
-              <select id="plan-cat" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:0.9rem;background:var(--surface);color:var(--text)"></select>
-            </div>
-            <div class="field">
-              <label class="field-label">Planned Amount (€)</label>
-              <input type="number" id="plan-amount" min="0" step="0.01" placeholder="0.00"
-                style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:0.9rem;background:var(--surface);color:var(--text);box-sizing:border-box" />
-            </div>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
-            <div class="field">
-              <label class="field-label">Label (optional)</label>
-              <input type="text" id="plan-label" placeholder="e.g. Summer skiing trip"
-                style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:0.9rem;background:var(--surface);color:var(--text);box-sizing:border-box" />
-            </div>
-            <div class="field" style="display:flex;align-items:flex-end;padding-bottom:2px">
-              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:0.88rem;font-weight:500">
-                <input type="checkbox" id="plan-recurring" style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer" />
-                Recurring every month
-              </label>
-            </div>
-          </div>
-          <div style="display:flex;gap:8px">
-            <button class="btn btn-primary btn-sm" onclick="savePlanItem()">Save</button>
-            <button class="btn btn-ghost btn-sm" onclick="closePlannerForm()">Cancel</button>
-          </div>
-        </div>
-
-        <!-- Plan items list -->
-        <div id="planner-items-list"></div>
-
-        <!-- Unplanned spending -->
-        <div id="planner-unplanned-card" style="display:none"></div>
-
-        <!-- Month savings summary -->
-        <div class="card" id="planner-savings-card" style="display:none;margin-top:20px;padding:20px">
-          <div style="font-family:'DM Serif Display',serif;font-size:1.1rem;margin-bottom:16px">Month-end Summary</div>
-          <div id="planner-savings-body"></div>
-        </div>
-
-      </div>
     </div>
 
     <div class="tab-content" id="tab-categories">
@@ -1856,7 +1873,7 @@ async function initApp(user) {
     document.getElementById('manage-income-btn').style.display = 'inline-block';
     document.getElementById('admin-settings-btn').style.display = 'inline-flex';
     const savingsBtn = document.getElementById('nav-savings-btn');
-    if (savingsBtn) savingsBtn.style.display = '';
+    // savings now inside budget tab
     const catBtn = document.getElementById('nav-categories-btn');
     if (catBtn) catBtn.style.display = '';
   }
@@ -2077,8 +2094,10 @@ async function changeMonth(delta) {
   selectedMonth = { year: y, month: m };
   updateMonthPickerLabel();
   const activeTab = document.querySelector('.nav-btn.active')?.dataset?.tab;
+  const activeSub = document.querySelector('.budget-sub-btn.active')?.dataset?.sub;
   const loads = [loadDashboard(), loadTransactions()];
-  if (activeTab === 'planner') loads.push(loadPlannerData());
+  if (activeTab === 'budget' && activeSub === 'planner') loads.push(loadPlannerData());
+  if (activeTab === 'budget' && activeSub === 'saving-goals') loads.push(loadSavings());
   await Promise.all(loads);
 }
 
@@ -4240,12 +4259,19 @@ async function loadStatsData() {
   let iq = sb.from('incomes').select('*, members(name)');
   if (activeMemberId) iq = iq.eq('member_id', activeMemberId);
 
+  let fixedQ = sb.from('fixed_anchors').select('*, members(name)');
+  let periodicQ = sb.from('periodic_buffers').select('*, members(name)');
+  if (activeMemberId) {
+    fixedQ = fixedQ.eq('member_id', activeMemberId);
+    periodicQ = periodicQ.eq('member_id', activeMemberId);
+  }
+
   const [{ data: txs }, { data: allTxs }, { data: incs }, { data: fixed }, { data: periodic }] = await Promise.all([
     tq,
     allTxQ,
     iq,
-    sb.from('fixed_anchors').select('*, members(name)'),
-    sb.from('periodic_buffers').select('*, members(name)')
+    fixedQ,
+    periodicQ
   ]);
 
   statsData = { transactions: txs || [], allTransactions: allTxs || [], incomes: incs || [], fixed: fixed || [], periodic: periodic || [] };
@@ -4280,6 +4306,12 @@ function renderStatsKPIs() {
   const savingsRate = monthlyIncome > 0 ? Math.round((1 - curSpend / monthlyIncome) * 100) : null;
   const spendDelta = prevSpend > 0 ? Math.round(((curSpend - prevSpend) / prevSpend) * 100) : null;
 
+  // Expense breakdown F/P/V for current month
+  const curFixed = fixedTotal;
+  const curPeriodic = periodicAvg;
+  const curVariable = curTx.filter(t => t.type === 'Fluctuating' || !t.type || t.type === 'Variable')
+    .reduce((s,t) => s+Number(t.price), 0);
+
   // Top category this period
   const cats = {};
   statsData.transactions.forEach(t => { cats[t.category] = (cats[t.category]||0) + Number(t.price); });
@@ -4288,9 +4320,9 @@ function renderStatsKPIs() {
   const kpis = [
     { label: 'Monthly Income', value: monthlyIncome.toFixed(0) + ' €', delta: null, color: 'var(--accent2)' },
     { label: statsMonths === 1 ? 'This Month Spend' : `Avg Monthly Spend`, value: (statsMonths === 1 ? curSpend : totalTx/statsMonths).toFixed(0) + ' €',
-      delta: spendDelta !== null ? (spendDelta > 0 ? `▲ ${spendDelta}% vs last month` : `▼ ${Math.abs(spendDelta)}% vs last month`) : null,
-      deltaClass: spendDelta > 0 ? 'down' : 'up', color: 'var(--danger)' },
-    { label: 'Fixed Budget/mo', value: totalBudget.toFixed(0) + ' €', delta: null, color: 'var(--text)' },
+      delta: `F: ${curFixed.toFixed(0)} € · P: ${curPeriodic.toFixed(0)} € · V: ${curVariable.toFixed(0)} €`,
+      deltaClass: '', color: 'var(--danger)' },
+    { label: 'Fixed Budget/mo', value: totalBudget.toFixed(0) + ' €', delta: `Fix: ${fixedTotal.toFixed(0)} € · Per: ${periodicAvg.toFixed(0)} €`, deltaClass: '', color: 'var(--text)' },
     { label: 'Savings Rate', value: savingsRate !== null ? savingsRate + '%' : '—',
       delta: savingsRate !== null ? (savingsRate >= 20 ? 'Good!' : savingsRate >= 10 ? 'OK' : 'Below target') : null,
       deltaClass: savingsRate >= 20 ? 'up' : savingsRate >= 10 ? '' : 'down', color: savingsRate >= 20 ? 'var(--accent2)' : 'var(--danger)' },
@@ -5393,13 +5425,36 @@ ${oneOffs.map(p=>p.category+(p.label?' ('+p.label+')':'')).join(', ')}`;
   await loadPlannerData();
 }
 
+function switchBudgetSub(sub) {
+  document.querySelectorAll('.budget-sub-btn').forEach(b => {
+    const active = b.dataset.sub === sub;
+    b.style.color = active ? 'var(--accent)' : 'var(--muted)';
+    b.style.borderBottomColor = active ? 'var(--accent)' : 'transparent';
+    b.style.fontWeight = active ? '600' : '600';
+  });
+  document.querySelectorAll('.budget-sub-content').forEach(el => {
+    el.style.display = el.id === 'budget-sub-' + sub ? '' : 'none';
+  });
+  if (sub === 'planner') loadPlannerData();
+  if (sub === 'saving-goals') loadSavings();
+  if (sub === 'expenses') {
+    if (isAdmin && !filterMemberId) loadBudgetRulesAllFamily(buildCatOptions());
+    else loadBudgetRules();
+  }
+}
+
 function switchTab(tab) {
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
-  document.getElementById('tab-' + tab).classList.add('active');
-  document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
+  // savings and planner now live inside budget tab
+  const resolvedTab = (tab === 'savings' || tab === 'planner') ? 'budget' : tab;
+  document.getElementById('tab-' + resolvedTab).classList.add('active');
+  document.querySelector(`[data-tab="${resolvedTab}"]`)?.classList.add('active');
+  if (resolvedTab === 'budget') {
+    const sub = tab === 'savings' ? 'saving-goals' : tab === 'planner' ? 'planner' : 'expenses';
+    switchBudgetSub(sub);
+  }
   if (tab === 'statistics') { initStatsControls(); loadStatsData(); }
-  if (tab === 'planner') { loadPlannerData(); }
   if (tab === 'categories') { if (!isAdmin) { switchTab('dashboard'); return; } loadCategories(); }
 }
 
