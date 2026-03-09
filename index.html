@@ -1901,6 +1901,7 @@ async function initApp(user) {
 
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
+  document.getElementById('current-member-name').textContent = currentMember.name;
 
   // Set role-based access
   isAdmin = currentMember?.is_admin === true;
@@ -1957,8 +1958,9 @@ async function loadMembers() {
   const { data } = await sb.from('members').select('*').order('id');
   members = data || [];
 
-  // Identify current member by auth_id (exclude pending)
-  currentMember = members.find(m => m.auth_id === currentUser.id && !m.is_pending) || members[0];
+  // Identify current member by auth_id (exclude pending) — don't fall back to members[0]
+  const matched = members.find(m => m.auth_id === currentUser.id && !m.is_pending);
+  if (matched) currentMember = matched;
   if (currentMember) {
     document.getElementById('current-member-name').textContent = currentMember.name;
   }
