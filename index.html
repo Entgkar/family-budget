@@ -1001,6 +1001,7 @@
     <button class="nav-btn" onclick="switchTab('budget')" data-tab="budget">Budget Rules</button>
     <button class="nav-btn" id="nav-savings-btn" onclick="switchTab('savings')" data-tab="savings">Savings</button>
     <button class="nav-btn" onclick="switchTab('statistics')" data-tab="statistics">Statistics</button>
+    <button class="nav-btn" onclick="switchTab('planner')" data-tab="planner">Planner</button>
     <button class="nav-btn" id="nav-categories-btn" onclick="switchTab('categories')" data-tab="categories" style="display:none">Categories</button>
   </nav>
 
@@ -1449,6 +1450,82 @@
     </div>
 
     <!-- ── CATEGORIES ── -->
+    <!-- ── PLANNER TAB ── -->
+    <div class="tab-content" id="tab-planner" style="width:100%">
+      <div style="max-width:900px;margin:0 auto;padding:0 0 40px">
+
+        <!-- Header -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px">
+          <div>
+            <h2 style="font-family:'DM Serif Display',serif;font-size:1.5rem;margin:0 0 4px">Monthly Planner</h2>
+            <div style="font-size:0.82rem;color:var(--muted)" id="planner-month-label"></div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-ghost btn-sm" onclick="copyLastMonthPlan()" id="planner-copy-btn" style="display:none">↩ Copy Last Month</button>
+            <button class="btn btn-primary btn-sm" onclick="openPlannerAddForm()">+ Add Item</button>
+          </div>
+        </div>
+
+        <!-- Allocation summary bar -->
+        <div class="card" style="margin-bottom:20px;padding:16px 20px" id="planner-summary-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+            <div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted)">Income Allocation</div>
+            <div id="planner-alloc-label" style="font-size:0.82rem;color:var(--muted)"></div>
+          </div>
+          <div style="height:10px;background:var(--surface2);border-radius:99px;overflow:hidden;margin-bottom:10px">
+            <div id="planner-alloc-bar" style="height:100%;border-radius:99px;transition:width 0.4s;background:var(--accent)"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px" id="planner-summary-kpis"></div>
+        </div>
+
+        <!-- Add/Edit form -->
+        <div class="card" id="planner-form-card" style="display:none;margin-bottom:20px;padding:20px">
+          <div style="font-weight:700;font-size:0.95rem;margin-bottom:16px" id="planner-form-title">Add Plan Item</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+            <div class="field">
+              <label class="field-label">Category</label>
+              <select id="plan-cat" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:0.9rem;background:var(--surface);color:var(--text)"></select>
+            </div>
+            <div class="field">
+              <label class="field-label">Planned Amount (€)</label>
+              <input type="number" id="plan-amount" min="0" step="0.01" placeholder="0.00"
+                style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:0.9rem;background:var(--surface);color:var(--text);box-sizing:border-box" />
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+            <div class="field">
+              <label class="field-label">Label (optional)</label>
+              <input type="text" id="plan-label" placeholder="e.g. Summer skiing trip"
+                style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:0.9rem;background:var(--surface);color:var(--text);box-sizing:border-box" />
+            </div>
+            <div class="field" style="display:flex;align-items:flex-end;padding-bottom:2px">
+              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:0.88rem;font-weight:500">
+                <input type="checkbox" id="plan-recurring" style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer" />
+                Recurring every month
+              </label>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-primary btn-sm" onclick="savePlanItem()">Save</button>
+            <button class="btn btn-ghost btn-sm" onclick="closePlannerForm()">Cancel</button>
+          </div>
+        </div>
+
+        <!-- Plan items list -->
+        <div id="planner-items-list"></div>
+
+        <!-- Unplanned spending -->
+        <div id="planner-unplanned-card" style="display:none"></div>
+
+        <!-- Month savings summary -->
+        <div class="card" id="planner-savings-card" style="display:none;margin-top:20px;padding:20px">
+          <div style="font-family:'DM Serif Display',serif;font-size:1.1rem;margin-bottom:16px">Month-end Summary</div>
+          <div id="planner-savings-body"></div>
+        </div>
+
+      </div>
+    </div>
+
     <div class="tab-content" id="tab-categories">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
         <div class="card-title" style="margin-bottom:0">Category Manager</div>
@@ -1999,7 +2076,10 @@ async function changeMonth(delta) {
   if (m < 0) { m = 11; y--; }
   selectedMonth = { year: y, month: m };
   updateMonthPickerLabel();
-  await Promise.all([loadDashboard(), loadTransactions()]);
+  const activeTab = document.querySelector('.nav-btn.active')?.dataset?.tab;
+  const loads = [loadDashboard(), loadTransactions()];
+  if (activeTab === 'planner') loads.push(loadPlannerData());
+  await Promise.all(loads);
 }
 
 async function setMemberFilter(memberId, btn) {
@@ -4491,7 +4571,12 @@ function toggleMCDropdown(e) {
   const panel = document.getElementById('mc-compare-panel');
   if (!panel) return;
   const isOpen = panel.style.display !== 'none';
-  if (isOpen) { panel.style.display = 'none'; return; }
+  if (isOpen) {
+    panel.style.display = 'none';
+    const sm = document.getElementById('mc-cat-submenu-float');
+    if (sm) sm.style.display = 'none';
+    return;
+  }
   buildMCDropdownPanel();
   panel.style.display = 'block';
   // Close on outside click
@@ -4516,7 +4601,6 @@ function buildMCDropdownPanel() {
     { value: 'income', label: 'Income' },
   ];
 
-  // All categories including income categories
   const primaries = allCategories.filter(c => !c.parent_id);
   const hasCats = primaries.length > 0;
 
@@ -4532,53 +4616,80 @@ function buildMCDropdownPanel() {
     </div>`).join('');
 
   if (hasCats) {
-    html += `<div style="height:1px;background:var(--border);margin:4px 0"></div>`;
-    // Single "Categories ▶" row that reveals submenu on hover
-    html += `
-      <div id="mc-cat-trigger" style="${itemStyle('__cat__')};position:relative"
-        onmouseenter="document.getElementById('mc-cat-submenu').style.display='block'"
-        onmouseleave="
-          const sm=document.getElementById('mc-cat-submenu');
-          setTimeout(()=>{ if(!sm.matches(':hover')) sm.style.display='none'; },80)
-        ">
+    html += `<div style="height:1px;background:var(--border);margin:4px 0"></div>
+      <div style="${itemStyle('__cat__')}"
+        id="mc-cat-trigger"
+        onmouseenter="showMCCatSubmenu(this)"
+        onmouseleave="hideMCCatSubmenuDelayed()">
         <span>Categories</span>
         <span style="font-size:0.65rem;color:var(--muted)">▶</span>
-        <!-- Submenu -->
-        <div id="mc-cat-submenu" style="display:none;position:absolute;left:100%;top:0;min-width:220px;max-height:340px;overflow-y:auto;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.12);z-index:1000;padding:6px 0"
-          onmouseenter="this.style.display='block'"
-          onmouseleave="this.style.display='none'">
-          ${primaries.map(p => {
-            const subs = allCategories.filter(c => c.parent_id === p.id);
-            const abbr = p.abbreviation || p.name.slice(0,2).toUpperCase();
-            const catVal = 'cat:' + p.name;
-            const isIncome = p.is_income;
-            let rows = `
-              <div style="display:flex;align-items:center;gap:8px;padding:7px 14px;font-size:0.82rem;cursor:pointer;transition:background 0.1s;background:${mcCompareValue===catVal?'var(--surface2)':'transparent'};font-weight:${mcCompareValue===catVal?'600':'400'}"
-                onmouseover="this.style.background='var(--surface2)'"
-                onmouseout="this.style.background='${mcCompareValue===catVal?'var(--surface2)':'transparent'}'"
-                onclick="selectMCCompare('${catVal}','${p.name}')">
-                <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;background:${isIncome?'var(--accent2)':'var(--accent)'};color:#fff;font-size:0.58rem;font-weight:700;flex-shrink:0">${abbr}</span>
-                <span>${p.name}</span>
-                ${mcCompareValue===catVal?'<span style="margin-left:auto;color:var(--accent);font-size:0.7rem">✓</span>':''}
-              </div>`;
-            subs.forEach(s => {
-              const subVal = 'cat:' + s.name;
-              rows += `
-                <div style="display:flex;align-items:center;gap:6px;padding:5px 14px 5px 30px;font-size:0.78rem;cursor:pointer;transition:background 0.1s;background:${mcCompareValue===subVal?'var(--surface2)':'transparent'};color:${mcCompareValue===subVal?'var(--text)':'var(--muted)'}"
-                  onmouseover="this.style.background='var(--surface2)';this.style.color='var(--text)'"
-                  onmouseout="this.style.background='${mcCompareValue===subVal?'var(--surface2)':'transparent'}';this.style.color='${mcCompareValue===subVal?'var(--text)':'var(--muted)'}'"
-                  onclick="selectMCCompare('${subVal}','${p.name}: ${s.name}')">
-                  <span style="color:var(--border);font-size:0.7rem">└</span><span>${s.name}</span>
-                  ${mcCompareValue===subVal?'<span style="margin-left:auto;color:var(--accent);font-size:0.7rem">✓</span>':''}
-                </div>`;
-            });
-            return rows;
-          }).join('')}
-        </div>
       </div>`;
   }
 
   panel.innerHTML = html;
+  // Pre-build the floating submenu attached to body
+  buildMCCatSubmenu(primaries);
+}
+
+function buildMCCatSubmenu(primaries) {
+  // Remove old if exists
+  const old = document.getElementById('mc-cat-submenu-float');
+  if (old) old.remove();
+
+  const sm = document.createElement('div');
+  sm.id = 'mc-cat-submenu-float';
+  sm.style.cssText = 'display:none;position:fixed;min-width:230px;max-height:400px;overflow-y:auto;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,0.15);z-index:9999;padding:6px 0';
+  sm.onmouseenter = () => { clearTimeout(window._mcSubHideTimer); };
+  sm.onmouseleave = () => { hideMCCatSubmenuDelayed(); };
+
+  primaries.forEach(p => {
+    const subs = allCategories.filter(c => c.parent_id === p.id);
+    const abbr = p.abbreviation || p.name.slice(0,2).toUpperCase();
+    const catVal = 'cat:' + p.name;
+    const isIncome = p.is_income;
+
+    const row = document.createElement('div');
+    row.style.cssText = `display:flex;align-items:center;gap:8px;padding:7px 14px;font-size:0.82rem;cursor:pointer;transition:background 0.1s;background:${mcCompareValue===catVal?'var(--surface2)':'transparent'};font-weight:${mcCompareValue===catVal?'600':'400'}`;
+    row.innerHTML = `<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;background:${isIncome?'var(--accent2)':'var(--accent)'};color:#fff;font-size:0.58rem;font-weight:700;flex-shrink:0">${abbr}</span><span>${p.name}</span>${mcCompareValue===catVal?'<span style="margin-left:auto;color:var(--accent);font-size:0.7rem">✓</span>':''}`;
+    row.onmouseover = () => { row.style.background = 'var(--surface2)'; };
+    row.onmouseout = () => { row.style.background = mcCompareValue===catVal ? 'var(--surface2)' : 'transparent'; };
+    row.onclick = () => selectMCCompare(catVal, p.name);
+    sm.appendChild(row);
+
+    subs.forEach(s => {
+      const subVal = 'cat:' + s.name;
+      const srow = document.createElement('div');
+      srow.style.cssText = `display:flex;align-items:center;gap:6px;padding:5px 14px 5px 30px;font-size:0.78rem;cursor:pointer;transition:background 0.1s;background:${mcCompareValue===subVal?'var(--surface2)':'transparent'};color:${mcCompareValue===subVal?'var(--text)':'var(--muted)'}`;
+      srow.innerHTML = `<span style="color:var(--border);font-size:0.7rem">└</span><span>${s.name}</span>${mcCompareValue===subVal?'<span style="margin-left:auto;color:var(--accent);font-size:0.7rem">✓</span>':''}`;
+      srow.onmouseover = () => { srow.style.background = 'var(--surface2)'; srow.style.color = 'var(--text)'; };
+      srow.onmouseout = () => { srow.style.background = mcCompareValue===subVal?'var(--surface2)':'transparent'; srow.style.color = mcCompareValue===subVal?'var(--text)':'var(--muted)'; };
+      srow.onclick = () => selectMCCompare(subVal, p.name + ': ' + s.name);
+      sm.appendChild(srow);
+    });
+  });
+
+  document.body.appendChild(sm);
+}
+
+function showMCCatSubmenu(triggerEl) {
+  clearTimeout(window._mcSubHideTimer);
+  const sm = document.getElementById('mc-cat-submenu-float');
+  if (!sm) return;
+  const rect = triggerEl.getBoundingClientRect();
+  sm.style.top = rect.top + 'px';
+  sm.style.left = (rect.right + 4) + 'px';
+  // Flip left if would go off screen
+  if (rect.right + 4 + 230 > window.innerWidth) {
+    sm.style.left = (rect.left - 234) + 'px';
+  }
+  sm.style.display = 'block';
+}
+
+function hideMCCatSubmenuDelayed() {
+  window._mcSubHideTimer = setTimeout(() => {
+    const sm = document.getElementById('mc-cat-submenu-float');
+    if (sm) sm.style.display = 'none';
+  }, 120);
 }
 
 function selectMCCompare(value, label) {
@@ -4588,6 +4699,8 @@ function selectMCCompare(value, label) {
   if (btn) btn.textContent = label.length > 20 ? label.slice(0,18)+'…' : label;
   const panel = document.getElementById('mc-compare-panel');
   if (panel) panel.style.display = 'none';
+  const sm = document.getElementById('mc-cat-submenu-float');
+  if (sm) sm.style.display = 'none';
   renderMemberComparison();
 }
 
@@ -4869,12 +4982,426 @@ async function exportPDF() {
 // ═══════════════════════════════════════════════════════
 // UI HELPERS
 // ═══════════════════════════════════════════════════════
+// ══════════════════════════════════════════════
+// ── PLANNER ──
+// ══════════════════════════════════════════════
+let plannerData = []; // monthly_plans rows
+let plannerTxData = []; // transactions for current planner month
+let plannerIncome = 0;
+let editingPlanId = null;
+
+function getPlannerMonthKey() {
+  return `${selectedMonth.year}-${String(selectedMonth.month + 1).padStart(2,'0')}`;
+}
+
+async function loadPlannerData() {
+  const monthKey = getPlannerMonthKey();
+  const memberId = isAdmin ? (filterMemberId || null) : currentMember?.id;
+  const d = new Date(selectedMonth.year, selectedMonth.month, 1);
+  document.getElementById('planner-month-label').textContent =
+    d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+
+  // Load plans for this month
+  let pq = sb.from('monthly_plans').select('*').eq('month', monthKey).order('category');
+  if (memberId) pq = pq.eq('member_id', memberId);
+  const { data: plans } = await pq;
+  plannerData = plans || [];
+
+  // Load transactions for this month
+  let tq = sb.from('transactions').select('*').gte('created_at', monthKey + '-01').lt('created_at',
+    `${selectedMonth.month === 11 ? selectedMonth.year + 1 : selectedMonth.year}-${String(selectedMonth.month === 11 ? 1 : selectedMonth.month + 2).padStart(2,'0')}-01`);
+  if (memberId) tq = tq.eq('member_id', memberId);
+  const { data: txs } = await tq;
+  plannerTxData = txs || [];
+
+  // Income
+  let iq = sb.from('incomes').select('*');
+  if (memberId) iq = iq.eq('member_id', memberId);
+  const { data: incs } = await iq;
+  plannerIncome = (incs || []).reduce((s, i) => s + Number(i.monthly_income || 0), 0);
+
+  // Show "Copy Last Month" if this month has no plans but previous month has some
+  await checkCopyAvailable(monthKey, memberId);
+
+  // Populate category dropdown
+  populatePlanCatDropdown();
+
+  renderPlanner();
+}
+
+async function checkCopyAvailable(monthKey, memberId) {
+  const [y, m] = monthKey.split('-').map(Number);
+  const prevM = m === 1 ? 12 : m - 1;
+  const prevY = m === 1 ? y - 1 : y;
+  const prevKey = `${prevY}-${String(prevM).padStart(2,'0')}`;
+  let pq = sb.from('monthly_plans').select('*').eq('month', prevKey);
+  if (memberId) pq = pq.eq('member_id', memberId);
+  const { data: prevPlans } = await pq;
+  const hasRecurring = prevPlans && prevPlans.some(p => p.is_recurring);
+
+  // Auto-copy recurring items silently when starting a new month with no plan
+  if (plannerData.length === 0 && hasRecurring) {
+    const recurringItems = prevPlans.filter(p => p.is_recurring).map(p => ({
+      category: p.category,
+      planned_amount: p.planned_amount,
+      label: p.label,
+      is_recurring: true,
+      month: monthKey,
+      member_id: memberId
+    }));
+    await sbOp(() => sb.from('monthly_plans').insert(recurringItems));
+    // Reload plans after auto-insert
+    let pq2 = sb.from('monthly_plans').select('*').eq('month', monthKey).order('category');
+    if (memberId) pq2 = pq2.eq('member_id', memberId);
+    const { data: newPlans } = await pq2;
+    plannerData = newPlans || [];
+    toast(`${recurringItems.length} recurring items auto-added for this month`, 'success');
+  }
+
+  const btn = document.getElementById('planner-copy-btn');
+  const hasOneOffs = prevPlans && prevPlans.some(p => !p.is_recurring);
+  if (btn) btn.style.display = (hasOneOffs && plannerData.length === prevPlans?.filter(p=>p.is_recurring).length) ? '' : 'none';
+}
+
+function populatePlanCatDropdown() {
+  const sel = document.getElementById('plan-cat');
+  if (!sel) return;
+  const primaries = allCategories.filter(c => !c.parent_id);
+  const allCats = allCategories.filter(c => !c.parent_id || true); // flat list
+  sel.innerHTML = primaries.map(p => {
+    const subs = allCategories.filter(c => c.parent_id === p.id);
+    if (subs.length) {
+      return `<optgroup label="${p.name}">
+        <option value="${p.name}">${p.name} (general)</option>
+        ${subs.map(s => `<option value="${s.name}">${s.name}</option>`).join('')}
+      </optgroup>`;
+    }
+    return `<option value="${p.name}">${p.name}</option>`;
+  }).join('');
+}
+
+function renderPlanner() {
+  renderPlannerSummary();
+  renderPlannerItems();
+  renderPlannerUnplanned();
+  renderPlannerSavings();
+}
+
+function renderPlannerSummary() {
+  const totalPlanned = plannerData.reduce((s, p) => s + Number(p.planned_amount), 0);
+  const totalSpent = plannerData.reduce((s, p) => {
+    return s + plannerTxData.filter(t => t.category === p.category).reduce((a, t) => a + Number(t.price), 0);
+  }, 0);
+  const unallocated = plannerIncome - totalPlanned;
+  const pct = plannerIncome > 0 ? Math.min(100, totalPlanned / plannerIncome * 100) : 0;
+
+  const bar = document.getElementById('planner-alloc-bar');
+  const label = document.getElementById('planner-alloc-label');
+  if (bar) {
+    bar.style.width = pct.toFixed(1) + '%';
+    bar.style.background = unallocated < 0 ? 'var(--danger)' : 'var(--accent)';
+  }
+  if (label) {
+    label.textContent = unallocated >= 0
+      ? `${unallocated.toFixed(0)} € unallocated → goes to savings`
+      : `${Math.abs(unallocated).toFixed(0)} € over-allocated`;
+    label.style.color = unallocated < 0 ? 'var(--danger)' : 'var(--muted)';
+  }
+
+  const kpis = document.getElementById('planner-summary-kpis');
+  if (kpis) {
+    const saved = totalPlanned - totalSpent;
+    kpis.innerHTML = [
+      { label: 'Monthly Income', value: `+${plannerIncome.toFixed(0)} €`, color: 'var(--accent2)' },
+      { label: 'Total Planned', value: `${totalPlanned.toFixed(0)} €`, color: 'var(--text)' },
+      { label: 'Spent So Far', value: `−${totalSpent.toFixed(0)} €`, color: totalSpent > totalPlanned ? 'var(--danger)' : 'var(--accent)' },
+      { label: 'Saved from Plan', value: saved >= 0 ? `+${saved.toFixed(0)} €` : `−${Math.abs(saved).toFixed(0)} €`, color: saved >= 0 ? 'var(--accent2)' : 'var(--danger)' },
+      { label: 'Unallocated', value: `${unallocated.toFixed(0)} €`, color: unallocated >= 0 ? 'var(--accent2)' : 'var(--danger)' },
+    ].map(k => `
+      <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:10px 14px">
+        <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:4px">${k.label}</div>
+        <div style="font-family:'DM Serif Display',serif;font-size:1.1rem;font-weight:700;color:${k.color}">${k.value}</div>
+      </div>`).join('');
+  }
+}
+
+function renderPlannerItems() {
+  const el = document.getElementById('planner-items-list');
+  if (!el) return;
+
+  if (plannerData.length === 0) {
+    el.innerHTML = `<div class="card" style="padding:32px;text-align:center;color:var(--muted)">
+      <div style="font-size:1.5rem;margin-bottom:8px">📋</div>
+      <div style="font-weight:600;margin-bottom:4px">No plan for this month yet</div>
+      <div style="font-size:0.82rem">Add items to start planning your spending</div>
+    </div>`;
+    return;
+  }
+
+  const totalPlanned = plannerData.reduce((s, p) => s + Number(p.planned_amount), 0);
+
+  el.innerHTML = `<div class="card" style="padding:0;overflow:hidden">` +
+    plannerData.map((p, i) => {
+      const spent = plannerTxData
+        .filter(t => t.category === p.category)
+        .reduce((s, t) => s + Number(t.price), 0);
+      const planned = Number(p.planned_amount);
+      const pct = planned > 0 ? Math.min(100, spent / planned * 100) : 0;
+      const over = spent > planned;
+      const remaining = planned - spent;
+      const daysInMonth = new Date(selectedMonth.year, selectedMonth.month + 1, 0).getDate();
+      const today = new Date();
+      const dayOfMonth = selectedMonth.year === today.getFullYear() && selectedMonth.month === today.getMonth()
+        ? today.getDate() : daysInMonth;
+      const projected = dayOfMonth > 0 ? (spent / dayOfMonth * daysInMonth) : 0;
+      const projOver = projected > planned;
+
+      return `
+      <div style="padding:16px 20px;${i < plannerData.length - 1 ? 'border-bottom:1px solid var(--border)' : ''}">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:12px">
+          <div style="display:flex;align-items:center;gap:10px;min-width:0">
+            <div style="flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;background:${over?'var(--danger)':'var(--accent)'};color:#fff;font-size:0.62rem;font-weight:700">
+              ${(allCategories.find(c=>c.name===p.category)?.abbreviation || p.category.slice(0,2).toUpperCase())}
+            </div>
+            <div style="min-width:0">
+              <div style="font-weight:600;font-size:0.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.category}</div>
+              ${p.label ? `<div style="font-size:0.72rem;color:var(--muted)">${p.label}</div>` : ''}
+            </div>
+            ${p.is_recurring ? '<span style="font-size:0.65rem;background:var(--surface2);border:1px solid var(--border);border-radius:99px;padding:2px 7px;color:var(--muted);flex-shrink:0">recurring</span>' : ''}
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;flex-shrink:0">
+            <div style="text-align:right">
+              <div style="font-size:0.82rem;font-weight:700;color:${over?'var(--danger)':'var(--text)'}">
+                ${spent.toFixed(0)} € <span style="font-weight:400;color:var(--muted)">/ ${planned.toFixed(0)} €</span>
+              </div>
+              <div style="font-size:0.7rem;color:${over?'var(--danger)':remaining<=planned*0.1?'var(--accent)':'var(--muted)'}">
+                ${over ? `▲ ${Math.abs(remaining).toFixed(0)} € over` : `${remaining.toFixed(0)} € left`}
+              </div>
+            </div>
+            <div style="display:flex;gap:6px">
+              <button onclick="editPlanItem(${p.id})" style="background:none;border:none;cursor:pointer;color:var(--muted);padding:4px" title="Edit">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              </button>
+              <button onclick="deletePlanItem(${p.id})" style="background:none;border:none;cursor:pointer;color:var(--muted);padding:4px" title="Delete">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+        <!-- Progress bar -->
+        <div style="height:6px;background:var(--surface2);border-radius:99px;overflow:hidden;margin-bottom:4px">
+          <div style="height:100%;width:${pct.toFixed(1)}%;background:${over?'var(--danger)':pct>80?'var(--accent)':'var(--accent2)'};border-radius:99px;transition:width 0.4s"></div>
+        </div>
+        <!-- Projection -->
+        ${dayOfMonth < daysInMonth ? `
+        <div style="font-size:0.7rem;color:${projOver?'var(--danger)':'var(--muted)'}">
+          Projected: ${projected.toFixed(0)} € by end of month ${projOver?'▲ over budget':''}
+        </div>` : ''}
+      </div>`;
+    }).join('') + '</div>';
+}
+
+function renderPlannerUnplanned() {
+  const el = document.getElementById('planner-unplanned-card');
+  if (!el) return;
+  const plannedCats = new Set(plannerData.map(p => p.category));
+  const unplanned = {};
+  plannerTxData.forEach(t => {
+    if (!plannedCats.has(t.category)) {
+      unplanned[t.category] = (unplanned[t.category] || 0) + Number(t.price);
+    }
+  });
+  const entries = Object.entries(unplanned).sort((a,b) => b[1]-a[1]);
+  if (entries.length === 0) { el.style.display = 'none'; return; }
+  el.style.display = '';
+  el.innerHTML = `
+    <div class="card" style="margin-top:16px;padding:16px 20px;border-left:3px solid var(--accent)">
+      <div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:12px">Unplanned Spending</div>
+      ${entries.map(([cat, amt]) => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">
+          <div style="font-size:0.85rem">${cat}</div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="font-size:0.82rem;font-weight:600;color:var(--danger)">−${amt.toFixed(0)} €</div>
+            <button onclick="addPlanFromUnplanned('${cat}',${amt.toFixed(2)})"
+              style="font-size:0.7rem;padding:3px 8px;border:1.5px solid var(--border);border-radius:6px;background:var(--surface);cursor:pointer;color:var(--muted)">+ Add to plan</button>
+          </div>
+        </div>`).join('')}
+    </div>`;
+}
+
+function renderPlannerSavings() {
+  const el = document.getElementById('planner-savings-card');
+  const body = document.getElementById('planner-savings-body');
+  if (!el || !body) return;
+
+  if (plannerData.length === 0) { el.style.display = 'none'; return; }
+  el.style.display = '';
+
+  const totalPlanned = plannerData.reduce((s, p) => s + Number(p.planned_amount), 0);
+  const totalSpent = plannerTxData.reduce((s, t) => s + Number(t.price), 0);
+  const unallocated = plannerIncome - totalPlanned;
+  const savedFromPlan = totalPlanned - totalSpent;
+  const totalSaved = savedFromPlan + Math.max(0, unallocated);
+
+  const catSavings = plannerData.map(p => {
+    const spent = plannerTxData.filter(t=>t.category===p.category).reduce((s,t)=>s+Number(t.price),0);
+    return { cat: p.category, planned: Number(p.planned_amount), spent, diff: Number(p.planned_amount) - spent };
+  }).filter(r => r.diff !== 0).sort((a,b) => b.diff - a.diff);
+
+  body.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--border);border-radius:var(--radius-sm);overflow:hidden;margin-bottom:16px">
+      ${[
+        { label: 'Planned to spend', val: `${totalPlanned.toFixed(0)} €`, color: 'var(--text)' },
+        { label: 'Actually spent', val: `−${totalSpent.toFixed(0)} €`, color: 'var(--danger)' },
+        { label: 'Saved this month', val: `+${Math.max(0,totalSaved).toFixed(0)} €`, color: 'var(--accent2)' },
+      ].map(k=>`<div style="background:var(--surface2);padding:14px 16px">
+        <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:4px">${k.label}</div>
+        <div style="font-size:1.1rem;font-weight:700;font-family:'DM Serif Display',serif;color:${k.color}">${k.val}</div>
+      </div>`).join('')}
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <div style="font-size:0.75rem;color:var(--muted);padding:8px 0">
+        <span style="font-weight:600;color:var(--accent2)">+${Math.max(0,savedFromPlan).toFixed(0)} €</span> saved from unspent budget
+      </div>
+      <div style="font-size:0.75rem;color:var(--muted);padding:8px 0">
+        <span style="font-weight:600;color:var(--accent2)">+${Math.max(0,unallocated).toFixed(0)} €</span> from unallocated income
+      </div>
+    </div>
+    ${catSavings.length ? `
+    <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:8px">By Category</div>
+    ${catSavings.map(r=>`
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">
+        <div style="font-size:0.82rem">${r.cat}</div>
+        <div style="font-size:0.82rem;font-weight:600;color:${r.diff>=0?'var(--accent2)':'var(--danger)'}">
+          ${r.diff>=0?'+':''}${r.diff.toFixed(0)} €
+        </div>
+      </div>`).join('')}` : ''}`;
+}
+
+function openPlannerAddForm() {
+  editingPlanId = null;
+  document.getElementById('planner-form-title').textContent = 'Add Plan Item';
+  document.getElementById('plan-cat').value = '';
+  document.getElementById('plan-amount').value = '';
+  document.getElementById('plan-label').value = '';
+  document.getElementById('plan-recurring').checked = false;
+  document.getElementById('planner-form-card').style.display = '';
+  document.getElementById('plan-amount').focus();
+}
+
+function editPlanItem(id) {
+  const p = plannerData.find(x => x.id === id);
+  if (!p) return;
+  editingPlanId = id;
+  document.getElementById('planner-form-title').textContent = 'Edit Plan Item';
+  document.getElementById('plan-cat').value = p.category;
+  document.getElementById('plan-amount').value = p.planned_amount;
+  document.getElementById('plan-label').value = p.label || '';
+  document.getElementById('plan-recurring').checked = !!p.is_recurring;
+  document.getElementById('planner-form-card').style.display = '';
+  document.getElementById('plan-amount').focus();
+}
+
+function closePlannerForm() {
+  document.getElementById('planner-form-card').style.display = 'none';
+  editingPlanId = null;
+}
+
+function addPlanFromUnplanned(cat, amt) {
+  document.getElementById('plan-cat').value = cat;
+  document.getElementById('plan-amount').value = amt;
+  document.getElementById('planner-form-card').style.display = '';
+  document.getElementById('plan-amount').focus();
+}
+
+async function savePlanItem() {
+  const cat = document.getElementById('plan-cat').value;
+  const amt = parseFloat(document.getElementById('plan-amount').value);
+  const label = document.getElementById('plan-label').value.trim();
+  const recurring = document.getElementById('plan-recurring').checked;
+
+  if (!cat) return toast('Please select a category', 'error');
+  if (!amt || amt <= 0) return toast('Please enter a valid amount', 'error');
+
+  const memberId = isAdmin ? (filterMemberId || currentMember?.id) : currentMember?.id;
+  const payload = {
+    category: cat,
+    planned_amount: amt,
+    label: label || null,
+    is_recurring: recurring,
+    month: getPlannerMonthKey(),
+    member_id: memberId
+  };
+
+  if (editingPlanId) {
+    const { error } = await sbOp(() => sb.from('monthly_plans').update(payload).eq('id', editingPlanId));
+    if (error) return toast('Error updating plan item', 'error');
+    toast('Plan item updated');
+  } else {
+    const { error } = await sbOp(() => sb.from('monthly_plans').insert(payload));
+    if (error) return toast('Error saving plan item', 'error');
+    toast('Plan item added');
+  }
+
+  closePlannerForm();
+  await loadPlannerData();
+}
+
+async function deletePlanItem(id) {
+  if (!confirm('Delete this plan item?')) return;
+  const { error } = await sbOp(() => sb.from('monthly_plans').delete().eq('id', id));
+  if (error) return toast('Error deleting plan item', 'error');
+  toast('Plan item deleted');
+  await loadPlannerData();
+}
+
+async function copyLastMonthPlan() {
+  const monthKey = getPlannerMonthKey();
+  const [y, m] = monthKey.split('-').map(Number);
+  const prevM = m === 1 ? 12 : m - 1;
+  const prevY = m === 1 ? y - 1 : y;
+  const prevKey = `${prevY}-${String(prevM).padStart(2,'0')}`;
+  const memberId = isAdmin ? (filterMemberId || currentMember?.id) : currentMember?.id;
+
+  let pq = sb.from('monthly_plans').select('*').eq('month', prevKey);
+  if (memberId) pq = pq.eq('member_id', memberId);
+  const { data: prevPlans } = await pq;
+  if (!prevPlans || prevPlans.length === 0) return toast('No plan found for last month', 'error');
+
+  // Show confirmation with one-offs listed
+  const oneOffs = prevPlans.filter(p => !p.is_recurring);
+  const recurring = prevPlans.filter(p => p.is_recurring);
+  let msg = `Copy ${recurring.length} recurring items`;
+  if (oneOffs.length > 0) msg += `
+
+Also copy ${oneOffs.length} one-off items?
+${oneOffs.map(p=>p.category+(p.label?' ('+p.label+')':'')).join(', ')}`;
+  const includeOneOffs = oneOffs.length === 0 || confirm(msg + '
+
+Click OK to include one-offs, Cancel to skip them');
+
+  const toInsert = [...recurring, ...(includeOneOffs ? oneOffs : [])].map(p => ({
+    category: p.category,
+    planned_amount: p.planned_amount,
+    label: p.label,
+    is_recurring: p.is_recurring,
+    month: monthKey,
+    member_id: memberId
+  }));
+
+  const { error } = await sbOp(() => sb.from('monthly_plans').insert(toInsert));
+  if (error) return toast('Error copying plan', 'error');
+  toast(`Copied ${toInsert.length} items from last month`);
+  await loadPlannerData();
+}
+
 function switchTab(tab) {
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
   document.getElementById('tab-' + tab).classList.add('active');
   document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
   if (tab === 'statistics') { initStatsControls(); loadStatsData(); }
+  if (tab === 'planner') { loadPlannerData(); }
   if (tab === 'categories') { if (!isAdmin) { switchTab('dashboard'); return; } loadCategories(); }
 }
 
