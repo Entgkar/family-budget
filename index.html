@@ -1337,7 +1337,7 @@
       </div><!-- end budget-sub-saving-goals -->
 
       <!-- Planner sub-tab -->
-      <div id="budget-sub-planner" class="budget-sub-content" style="display:none">
+      <div id="budget-sub-planner" class="budget-sub-content" style="display:none;overflow:visible">
       <div style="max-width:900px;margin:0 auto;padding:0 0 40px">
 
         <!-- Header -->
@@ -1365,7 +1365,7 @@
         </div>
 
         <!-- Add/Edit form -->
-        <div class="card" id="planner-form-card" style="display:none;margin-bottom:20px;padding:20px">
+        <div class="card" id="planner-form-card" style="display:none;margin-bottom:20px;padding:20px;position:relative;z-index:10;overflow:visible">
           <div style="font-weight:700;font-size:0.95rem;margin-bottom:16px" id="planner-form-title">Add Plan Item</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
             <div class="field">
@@ -1478,7 +1478,7 @@
       </div>
 
       <!-- ── Member Comparison (dedicated card) ── -->
-      <div class="card" style="margin-bottom:20px" id="stats-member-compare-card">
+      <div class="card" style="margin-bottom:20px;display:none" id="stats-member-compare-card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
           <div class="card-title" style="margin-bottom:0">Member Comparison</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
@@ -1904,10 +1904,11 @@ async function initApp(user) {
   document.getElementById('current-member-name').textContent = currentMember.name;
 
   // Set role-based access
-  isAdmin = currentMember?.is_admin === true;
-
-  // Build member filter bar (loadMembers renders the buttons)
+  // Build member filter bar first
   await loadMembers();
+
+  // Recalculate isAdmin from fresh member data
+  isAdmin = currentMember?.is_admin === true;
 
   // Apply role-based UI after members are loaded
   if (!isAdmin) {
@@ -4796,6 +4797,9 @@ function initMCCompareOptions() {
 }
 
 function renderMemberComparison() {
+  const card = document.getElementById('stats-member-compare-card');
+  if (card) card.style.display = isAdmin ? '' : 'none';
+  if (!isAdmin) return;
   if (mcChart) { try { mcChart.destroy(); } catch(e){} mcChart = null; }
   const canvas = document.getElementById('mc-chart');
   const subtitle = document.getElementById('mc-subtitle');
