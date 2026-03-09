@@ -1221,7 +1221,7 @@
     <div class="tab-content" id="tab-budget" style="width:100%">
 
       <!-- Budget Sub-tab bar -->
-      <div style="display:flex;gap:0;margin-bottom:24px;border-bottom:2px solid var(--border)">
+      <div style="display:flex;gap:0;margin-bottom:24px;border-bottom:2px solid var(--border);position:sticky;top:104px;z-index:98;background:var(--bg);padding-top:8px;margin-top:-8px">
         <button class="budget-sub-btn active" data-sub="expenses" onclick="switchBudgetSub('expenses')"
           style="padding:10px 20px;font-size:0.88rem;font-weight:600;border:none;background:none;cursor:pointer;color:var(--accent);border-bottom:2px solid var(--accent);margin-bottom:-2px;font-family:'DM Sans',sans-serif">
           Expenses
@@ -1662,6 +1662,11 @@
 <div class="modal-overlay" id="modal-admin-settings">
   <div class="modal" style="max-width:520px">
     <div class="modal-title">Admin Settings</div>
+    <!-- Pending Users -->
+    <div id="pending-users-section" style="display:none;margin-bottom:20px">
+      <div style="font-weight:600;font-size:0.85rem;margin-bottom:10px;color:var(--danger);text-transform:uppercase;letter-spacing:0.04em">⏳ Pending Approvals</div>
+      <div id="pending-users-list"></div>
+    </div>
     <div style="font-weight:600;font-size:0.85rem;margin-bottom:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em">Family Members</div>
     <div id="members-list" style="margin-bottom:12px"></div>
     <button class="btn btn-secondary btn-sm" onclick="openModal('modal-add-member')">+ Add Member</button>
@@ -1803,11 +1808,33 @@ async function handleSignup() {
   const email = document.getElementById('signup-email').value.trim();
   const password = document.getElementById('signup-password').value;
   if (!name) return showAuthError('Please enter your name.');
+  if (!email) return showAuthError('Please enter your email.');
+  if (password.length < 6) return showAuthError('Password must be at least 6 characters.');
+
+  const signupBtn = document.querySelector('#signup-form .btn-primary');
+  if (signupBtn) { signupBtn.disabled = true; signupBtn.textContent = 'Creating account…'; }
+
   const { data, error } = await sb.auth.signUp({ email, password });
+
+  if (signupBtn) { signupBtn.disabled = false; signupBtn.textContent = 'Create Account'; }
   if (error) return showAuthError(error.message);
+
   if (data.user) {
-    await sb.from('members').insert({ name, auth_id: data.user.id });
-    showAuthError('Account created! Please check your email to confirm, then sign in.', false);
+    // Try to find an existing member with the same name (case-insensitive)
+    const { data: existingMembers } = await sb.from('members').select('*');
+    const match = (existingMembers || []).find(m =>
+      m.name.toLowerCase() === name.toLowerCase() && !m.auth_id
+    );
+
+    if (match) {
+      // Auto-link to existing member
+      await sb.from('members').update({ auth_id: data.user.id }).eq('id', match.id);
+      showAuthError('Account created and linked! Sign in to continue.', false);
+    } else {
+      // No match — store as pending with name, admin will link
+      await sb.from('members').insert({ name, auth_id: data.user.id, is_pending: true });
+      showAuthError('Account created! Waiting for admin to approve your access.', false);
+    }
   }
 }
 
@@ -1848,10 +1875,32 @@ function showAuthError(msg, isError = true) {
 // ═══════════════════════════════════════════════════════
 async function initApp(user) {
   currentUser = user;
+
+  // Load members first to check if this user is pending/unlinked
+  const { data: allMembers } = await sb.from('members').select('*').order('id');
+  members = allMembers || [];
+  currentMember = members.find(m => m.auth_id === user.id);
+
+  // If member is pending (no household data) or not found, show waiting screen
+  if (!currentMember || currentMember.is_pending) {
+    document.getElementById('auth-screen').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('auth-screen').innerHTML = `
+      <div class="auth-card" style="text-align:center">
+        <div class="logo">Family <span>Budget</span></div>
+        <div style="font-size:2rem;margin:20px 0 8px">⏳</div>
+        <div style="font-size:1.1rem;font-weight:700;margin-bottom:10px">Awaiting Approval</div>
+        <div style="font-size:0.85rem;color:var(--muted);margin-bottom:24px;line-height:1.6">
+          Your account has been created.<br>
+          An admin needs to approve your access before you can continue.
+        </div>
+        <button class="btn btn-primary btn-full" onclick="handleLogout()">Sign Out</button>
+      </div>`;
+    return;
+  }
+
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
-
-  await loadMembers();
 
   // Set role-based access
   isAdmin = currentMember?.is_admin === true;
@@ -1908,8 +1957,8 @@ async function loadMembers() {
   const { data } = await sb.from('members').select('*').order('id');
   members = data || [];
 
-  // Identify current member by auth_id
-  currentMember = members.find(m => m.auth_id === currentUser.id) || members[0];
+  // Identify current member by auth_id (exclude pending)
+  currentMember = members.find(m => m.auth_id === currentUser.id && !m.is_pending) || members[0];
   if (currentMember) {
     document.getElementById('current-member-name').textContent = currentMember.name;
   }
@@ -2120,6 +2169,8 @@ async function setMemberFilter(memberId, btn) {
   if (document.getElementById('tab-statistics')?.classList.contains('active')) {
     loads.push(loadStatsData());
   }
+  const activeSub = document.querySelector('.budget-sub-btn.active')?.dataset?.sub;
+  if (activeSub === 'planner') loads.push(loadPlannerData());
   await Promise.all(loads);
 }
 
@@ -5425,6 +5476,83 @@ ${oneOffs.map(p=>p.category+(p.label?' ('+p.label+')':'')).join(', ')}`;
   await loadPlannerData();
 }
 
+// ══════════════════════════════════════════════
+// ── PENDING USER APPROVALS ──
+// ══════════════════════════════════════════════
+async function loadPendingUsers() {
+  const { data: pending } = await sb.from('members').select('*').eq('is_pending', true);
+  const section = document.getElementById('pending-users-section');
+  const list = document.getElementById('pending-users-list');
+  if (!section || !list) return;
+
+  if (!pending || pending.length === 0) {
+    section.style.display = 'none';
+    return;
+  }
+
+  section.style.display = '';
+  // Get existing non-pending members for the link dropdown
+  const existing = members.filter(m => !m.is_pending && !m.auth_id);
+
+  list.innerHTML = pending.map(p => `
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface2);border-radius:8px;margin-bottom:8px;flex-wrap:wrap">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:0.88rem">${p.name}</div>
+        <div style="font-size:0.72rem;color:var(--muted)">Signed up · awaiting approval</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        ${existing.length > 0 ? `
+        <select id="link-select-${p.id}" style="padding:6px 10px;font-size:0.8rem;border:1.5px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);font-family:'DM Sans',sans-serif">
+          <option value="">Link to existing…</option>
+          ${existing.map(m => `<option value="${m.id}">${m.name}</option>`).join('')}
+        </select>
+        <button onclick="linkPendingUser(${p.id})" class="btn btn-primary btn-sm" style="font-size:0.78rem;padding:5px 12px">Link</button>
+        <span style="font-size:0.72rem;color:var(--muted)">or</span>` : ''}
+        <button onclick="approvePendingUser(${p.id})" class="btn btn-secondary btn-sm" style="font-size:0.78rem;padding:5px 12px">Approve as new member</button>
+        <button onclick="rejectPendingUser(${p.id})" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:0.78rem;padding:4px 6px">✕ Reject</button>
+      </div>
+    </div>`).join('');
+}
+
+async function linkPendingUser(pendingId) {
+  const sel = document.getElementById('link-select-' + pendingId);
+  const targetMemberId = sel?.value;
+  if (!targetMemberId) return toast('Please select an existing member to link to', 'error');
+
+  const pending = members.find(m => m.id === pendingId);
+  if (!pending) return;
+
+  // Copy auth_id to the target member, delete the pending row
+  const { error } = await sbOp(() =>
+    sb.from('members').update({ auth_id: pending.auth_id }).eq('id', parseInt(targetMemberId))
+  );
+  if (error) return toast('Error linking user', 'error');
+  await sbOp(() => sb.from('members').delete().eq('id', pendingId));
+  toast('User linked successfully');
+  await loadMembers();
+  await loadPendingUsers();
+  loadIncomes();
+}
+
+async function approvePendingUser(pendingId) {
+  const { error } = await sbOp(() =>
+    sb.from('members').update({ is_pending: false }).eq('id', pendingId)
+  );
+  if (error) return toast('Error approving user', 'error');
+  toast('User approved as new member');
+  await loadMembers();
+  await loadPendingUsers();
+  loadIncomes();
+}
+
+async function rejectPendingUser(pendingId) {
+  if (!confirm('Reject and delete this account request?')) return;
+  const { error } = await sbOp(() => sb.from('members').delete().eq('id', pendingId));
+  if (error) return toast('Error rejecting user', 'error');
+  toast('User rejected');
+  await loadPendingUsers();
+}
+
 function switchBudgetSub(sub) {
   document.querySelectorAll('.budget-sub-btn').forEach(b => {
     const active = b.dataset.sub === sub;
@@ -5468,6 +5596,7 @@ function switchAddTab(tab) {
 function openModal(id) {
   document.getElementById(id).classList.add('open');
   if (id === 'modal-income-manager' || id === 'modal-admin-settings') loadIncomes();
+  if (id === 'modal-admin-settings') loadPendingUsers();
 }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
