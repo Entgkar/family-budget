@@ -1906,14 +1906,16 @@ async function initApp(user) {
   // Set role-based access
   isAdmin = currentMember?.is_admin === true;
 
+  // Build member filter bar (loadMembers renders the buttons)
+  await loadMembers();
+
+  // Apply role-based UI after members are loaded
   if (!isAdmin) {
     filterMemberId = currentMember?.id || null;
-    // Hide member buttons but keep month picker visible
+    document.getElementById('member-filter').style.display = 'flex';
     document.querySelectorAll('#member-filter .mf-btn').forEach(b => b.style.display = 'none');
     document.getElementById('manage-income-btn').style.display = 'inline-block';
     document.getElementById('admin-settings-btn').style.display = 'none';
-    const savingsBtn = document.getElementById('nav-savings-btn');
-    if (savingsBtn) savingsBtn.style.display = 'none';
     const catBtn = document.getElementById('nav-categories-btn');
     if (catBtn) catBtn.style.display = 'none';
   } else {
@@ -1922,8 +1924,6 @@ async function initApp(user) {
     document.querySelectorAll('#member-filter .mf-btn').forEach(b => b.style.display = '');
     document.getElementById('manage-income-btn').style.display = 'inline-block';
     document.getElementById('admin-settings-btn').style.display = 'inline-flex';
-    const savingsBtn = document.getElementById('nav-savings-btn');
-    // savings now inside budget tab
     const catBtn = document.getElementById('nav-categories-btn');
     if (catBtn) catBtn.style.display = '';
   }
