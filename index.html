@@ -5376,9 +5376,7 @@ async function copyLastMonthPlan() {
 
 Also copy ${oneOffs.length} one-off items?
 ${oneOffs.map(p=>p.category+(p.label?' ('+p.label+')':'')).join(', ')}`;
-  const includeOneOffs = oneOffs.length === 0 || confirm(msg + '
-
-Click OK to include one-offs, Cancel to skip them');
+  const includeOneOffs = oneOffs.length === 0 || confirm(msg + "\n\nClick OK to include one-offs, Cancel to skip them");
 
   const toInsert = [...recurring, ...(includeOneOffs ? oneOffs : [])].map(p => ({
     category: p.category,
