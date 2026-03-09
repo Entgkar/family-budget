@@ -1331,7 +1331,7 @@
               <button class="stats-range-btn active" data-months="1" onclick="setStatsRange(1)">This Month</button>
               <button class="stats-range-btn" data-months="3" onclick="setStatsRange(3)">3 Months</button>
               <button class="stats-range-btn" data-months="6" onclick="setStatsRange(6)">6 Months</button>
-              <button class="stats-range-btn" data-months="12" onclick="setStatsRange(12)">This Year</button>
+              <button class="stats-range-btn" data-months="0" onclick="setStatsRange(0)">This Year</button>
             </div>
           </div>
           <div id="stats-member-controls" style="display:none"></div>
@@ -2734,11 +2734,11 @@ function toggleDayCard(headerEl) {
     body.style.display = 'block';
     body.style.overflow = 'hidden';
     body.style.height = '0px';
+    // Force layout recalc before measuring
+    void body.offsetHeight;
     body.style.transition = 'height 0.22s ease';
-    requestAnimationFrame(() => {
-      const h = body.scrollHeight;
-      requestAnimationFrame(() => { body.style.height = h + 'px'; });
-    });
+    const h = body.scrollHeight;
+    requestAnimationFrame(() => { body.style.height = h + 'px'; });
     body.addEventListener('transitionend', () => {
       body.style.height = '';
       body.style.overflow = '';
@@ -2763,11 +2763,10 @@ function toggleAllDayCards(btn) {
       body.style.display = 'block';
       body.style.overflow = 'hidden';
       body.style.height = '0px';
+      void body.offsetHeight;
       body.style.transition = 'height 0.18s ease';
-      requestAnimationFrame(() => {
-        const h = body.scrollHeight;
-        requestAnimationFrame(() => { body.style.height = h + 'px'; });
-      });
+      const h = body.scrollHeight;
+      requestAnimationFrame(() => { body.style.height = h + 'px'; });
       body.addEventListener('transitionend', () => {
         body.style.height = ''; body.style.overflow = ''; body.style.transition = '';
       }, { once: true });
@@ -4152,6 +4151,7 @@ let mcChart = null;
 function setStatsRange(months) {
   statsMonths = months;
   document.querySelectorAll('#stats-range-btns .stats-range-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.months) === months));
+  // statsMonths=0 is special: means current calendar year (Jan 1 to now)
   loadStatsData();
 }
 
@@ -4183,7 +4183,10 @@ function toggleExportPanel() {
 
 async function loadStatsData() {
   const now = new Date();
-  const from = new Date(now.getFullYear(), now.getMonth() - (statsMonths - 1), 1);
+  // statsMonths=0 means "This Year" = Jan 1 of current year
+  const from = statsMonths === 0
+    ? new Date(now.getFullYear(), 0, 1)
+    : new Date(now.getFullYear(), now.getMonth() - (statsMonths - 1), 1);
   const fromStr = from.toISOString().slice(0, 10);
 
   // Use the same filterMemberId as the rest of the app (top bar member selection)
@@ -4192,17 +4195,21 @@ async function loadStatsData() {
   let tq = sb.from('transactions').select('*, members(name)').gte('created_at', fromStr).order('created_at');
   if (activeMemberId) tq = tq.eq('member_id', activeMemberId);
 
+  // Also fetch ALL members' transactions (unfiltered) for Member Comparison chart
+  let allTxQ = sb.from('transactions').select('*, members(name)').gte('created_at', fromStr).order('created_at');
+
   let iq = sb.from('incomes').select('*, members(name)');
   if (activeMemberId) iq = iq.eq('member_id', activeMemberId);
 
-  const [{ data: txs }, { data: incs }, { data: fixed }, { data: periodic }] = await Promise.all([
+  const [{ data: txs }, { data: allTxs }, { data: incs }, { data: fixed }, { data: periodic }] = await Promise.all([
     tq,
+    allTxQ,
     iq,
     sb.from('fixed_anchors').select('*, members(name)'),
     sb.from('periodic_buffers').select('*, members(name)')
   ]);
 
-  statsData = { transactions: txs || [], incomes: incs || [], fixed: fixed || [], periodic: periodic || [] };
+  statsData = { transactions: txs || [], allTransactions: allTxs || [], incomes: incs || [], fixed: fixed || [], periodic: periodic || [] };
   renderStatsKPIs();
   initMCCompareOptions();
   renderMemberComparison();
@@ -4359,7 +4366,7 @@ function renderStatsBvA() {
           </div>
         </div>
         <div style="text-align:right;font-size:0.78rem;font-weight:600;color:${over?'var(--danger)':hasCatBudget?'var(--accent2)':'var(--muted)'}">
-          ${diff!==null ? (diff>=0?'▼ −':'▲ +') + Math.abs(diff).toFixed(0)+' €' : 'no budget'}
+          ${diff!==null ? (over?'▲ over':'▼ '+(Math.round(r.actual/r.budget*100))+'%') : 'no budget'}
         </div>
       </div>`;
     }).join('')}`;
@@ -4555,7 +4562,8 @@ function renderMemberComparison() {
 
   function getMemberValue(m, key) {
     // key is a date string prefix (YYYY-MM or YYYY-Www)
-    const mTx = statsData.transactions.filter(t => t.member_id === m.id && t.created_at.startsWith(key.slice(0,7)));
+    const allTx = statsData.allTransactions || statsData.transactions;
+    const mTx = allTx.filter(t => t.member_id === m.id && t.created_at.startsWith(key.slice(0,7)));
     if (compareBy === 'total') return mTx.reduce((s,t) => s+Number(t.price), 0);
     if (compareBy.startsWith('cat:')) {
       const cat = compareBy.slice(4);
@@ -4591,7 +4599,8 @@ function renderMemberComparison() {
   } else if (mcView === 'week') {
     // Last 8 ISO weeks with data
     const weekMap = {};
-    statsData.transactions.forEach(t => {
+    const allTxForWeeks = statsData.allTransactions || statsData.transactions;
+    allTxForWeeks.forEach(t => {
       const d = new Date(t.created_at);
       const { week, year: wy } = getISOWeek(d);
       const wk = `${wy}-W${String(week).padStart(2,'0')}`;
@@ -4606,7 +4615,7 @@ function renderMemberComparison() {
       label: m.name,
       data: sortedWeeks.map(([wk]) => {
         const [wy, wn] = wk.split('-W').map(Number);
-        const mTx = statsData.transactions.filter(t => {
+        const mTx = (statsData.allTransactions || statsData.transactions).filter(t => {
           if (t.member_id !== m.id) return false;
           const d = new Date(t.created_at);
           const { week, year: twy } = getISOWeek(d);
@@ -4629,10 +4638,11 @@ function renderMemberComparison() {
   } else {
     // Month-over-month — only show months that have data
     const monthMap = {};
-    statsData.transactions.forEach(t => {
+    const allTxForMonths = statsData.allTransactions || statsData.transactions;
+    allTxForMonths.forEach(t => {
       const key = t.created_at.slice(0,7);
       if (!monthMap[key]) {
-        const d = new Date(t.created_at);
+        const d = new Date(t.created_at + 'T12:00:00');
         monthMap[key] = d.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
       }
     });
